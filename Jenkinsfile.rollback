@@ -1,0 +1,38 @@
+pipeline {
+    agent any
+
+    triggers {
+        GenericTrigger(
+            genericVariables: [],
+            token: 'ROLLBACK_256094_TOKEN',
+            causeString: 'Triggered by Alertmanager: ModelConfidenceDrift detected',
+            printContributedVariables: true,
+            printPostContent: true
+        )
+    }
+
+    stages {
+
+        stage('Switch Traffic to Stable (Green)') {
+            steps {
+                sh """
+                    export KUBECONFIG=/var/lib/jenkins/.kube/config
+                    kubectl patch service sentiment-api-service \
+                        -p '{"spec":{"selector":{"slot":"green"}}}'
+                    echo "Traffic switched to stable GREEN deployment."
+                    kubectl get service sentiment-api-service -o jsonpath='{.spec.selector}'
+                """
+            }
+        }
+
+    }
+
+    post {
+        success {
+            echo 'Rollback to stable complete. Self-healing successful.'
+        }
+        failure {
+            echo 'Rollback failed. Manual intervention required.'
+        }
+    }
+}
